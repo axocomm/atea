@@ -1,21 +1,34 @@
 (ns tracker.core
   (:require [clojure.string :as string])
-  (:import org.jdesktop.jdic.tray.internal.impl.MacSystemTrayService)
-  (:import org.jdesktop.jdic.tray.internal.impl.MacTrayIconService)
+  (:import (java.awt AWTException
+                     Image
+                     MenuItem
+                     PopupMenu
+                     SystemTray
+                     Toolkit
+                     TrayIcon)
+           (java.awt.event ActionEvent
+                           ActionListener)
+           (java.net MalformedURLException
+                     URL)
+           (java.util Date))
   (:gen-class))
 
+(defn resource-path [name]
+  (str "resources/" name))
+
 (defn load-icon [name]
-  (javax.swing.ImageIcon. (javax.imageio.ImageIO/read (clojure.java.io/resource name))))
+  (.getImage (Toolkit/getDefaultToolkit) (resource-path name)))
 
 (defn get-tray []
-  (MacSystemTrayService/getInstance))
+  (SystemTray/getSystemTray))
 
 (defn create-menu []
-  (MacTrayIconService.))
+  (PopupMenu.))
 
 (defn action [f]
-  (reify java.awt.event.ActionListener 
-    (actionPerformed 
+  (reify java.awt.event.ActionListener
+    (actionPerformed
       [this event] (f))))
 
 ; Item management ----------------------------------------------------------
@@ -48,7 +61,7 @@
   (let [add-section
         (fn [add-sep? title sec-items]
           (if add-sep?
-            (.addSeparator menu)) 
+            (.addSeparator menu))
           (.addItem menu title nil)
           (.addSeparator menu)
           (doseq
@@ -57,7 +70,7 @@
               menu
               (if (= (key-task item) (key-task active))
                 (str "➡ " (:description item))  ;◆✦●
-                (:description item)) 
+                (:description item))
               (action #(actfn (assoc item :since (now)))))))
 
         add-priority
@@ -69,7 +82,7 @@
           (doseq [[prj items] (next prjs)] (add-section true prj items)))]
 
     ; remove old items
-    (doseq [index (range (.getItemCount menu))] (.removeItem menu 0)) 
+    (doseq [index (range (.getItemCount menu))] (.removeItem menu 0))
 
     ; add "now working" section
     (when active
@@ -80,18 +93,18 @@
                (to-str stime)
                " - Sum: "
                (to-str (+ (:time active) stime)))
-          nil) 
+          nil)
         (.addSeparator menu)
         (.addItem menu "Stop work" (action #(deactfn)))
-        (.addSeparator menu))) 
+        (.addSeparator menu)))
 
     ; add items sorted by priority and project
     (let [part-items (sort (parition-items items))]
       (if (first part-items)
         (add-priority false (key (first part-items)) (val (first part-items)))
-        (.addItem menu (str "No tasks in " file) nil)) 
+        (.addItem menu (str "No tasks in " file) nil))
       (doseq [[pri prjs] (next part-items)] (add-priority true pri prjs)))
-    
+
     ; quit menu item
     (.addSeparator menu)
     (.addItem menu "Quit Atea" (action #((deactfn) (System/exit 0))))))
@@ -123,9 +136,9 @@
   (let [match (re-matches #"\[(.*)\];(.*);(\d*);(\d*);(\d*)" line)]
     (when match
       {:project (unescape (match 1))
-       :description (unescape (match 2)) 
-       :priority (Long. (match 3)) 
-       :time (Long. (match 4)) 
+       :description (unescape (match 2))
+       :priority (Long. (match 3))
+       :time (Long. (match 4))
        :estimate (Long. (match 5))})))
 
 (defn write-ttask [ttask]
@@ -135,8 +148,8 @@
          (map ttask [:priority :time :estimate])))
 
 (defn load-ttasks [file]
-  (try 
-    (let [lines (filter (comp not empty?) (string/split-lines (slurp file))) 
+  (try
+    (let [lines (filter (comp not empty?) (string/split-lines (slurp file)))
           status (when (first lines) (parse-status (first lines)))]
       (if status
         {:active status
@@ -158,11 +171,11 @@
      :time 0}))
 
 (defn load-tasks [file]
-  (try 
+  (try
     ; filter out all non empty lines starting with one or more whitespaces
     (let [lines (filter
-                  #(not (re-matches #"\s+[^\s]+.*" %)) 
-                  (string/split-lines (slurp file))) 
+                  #(not (re-matches #"\s+[^\s]+.*" %))
+                  (string/split-lines (slurp file)))
           ; partition by empty or all-whitespace lines
           pris (filter
                  #(not (re-matches #"\s*" (first %)))
@@ -171,7 +184,7 @@
 
       ; flatten into maps
       (for [[pri items] tasks
-            task items] (into (parse-task task) {:priority pri :time 0}))) 
+            task items] (into (parse-task task) {:priority pri :time 0})))
     (catch java.io.FileNotFoundException e [])))
 
 (defn key-tasks [tasks]
@@ -187,16 +200,16 @@
                 (key-tasks (:ttasks ttasks)))
 
           ; merge textfile tasks and tracked tasks
-          tmerged (vals (merge-with (fn [t tt] {:priority (:priority t) 
+          tmerged (vals (merge-with (fn [t tt] {:priority (:priority t)
                                                 :project (:project t)
                                                 :estimate (:estimate t)
                                                 :description (:description t)
                                                 :time (:time tt)})
                                     (key-tasks tasks)
                                     kts))
-          
+
           ; get active time
-          tactive (when new-active 
+          tactive (when new-active
                     (assoc new-active :time (get-in kts [(key-task new-active) :time] 0)))
 
           ; write lines
@@ -205,7 +218,7 @@
                                       (cons (write-status tactive) lines)
                                       lines))]
 
-      (spit file content)) 
+      (spit file content))
     (catch java.io.FileNotFoundException e nil)))
 
 ; Track file updates -------------------------------------------------------
@@ -274,13 +287,12 @@
 
                  ; update menu
                  (when tasks
-                   (reset! old-file file) 
+                   (reset! old-file file)
                    (update-items file menu tasks (:active ttasks)
                                  (fn [new-active]
                                    (write-ttasks tfile tasks ttasks new-active)
-                                   (.setIcon menu icon-active)) 
+                                   (.setIcon menu icon-active))
                                  (fn []
                                    (write-ttasks tfile tasks ttasks nil)
-                                   (.setIcon menu icon-inactive))))))) 
+                                   (.setIcon menu icon-inactive)))))))
    (Thread/sleep (Long/MAX_VALUE))))
-
