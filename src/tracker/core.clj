@@ -62,17 +62,16 @@
         (fn [add-sep? title sec-items]
           (if add-sep?
             (.addSeparator menu))
-          (.addItem menu title nil)
+          (.add menu title)
           (.addSeparator menu)
           (doseq
             [item sec-items]
-            (.addItem
-              menu
-              (if (= (key-task item) (key-task active))
-                (str "➡ " (:description item))  ;◆✦●
-                (:description item))
-              (action #(actfn (assoc item :since (now)))))))
-
+            (let [new-item (MenuItem. (if (= (key-task item) (key-task active))
+                                        (str "➡ " (:description item))  ;◆✦●
+                                        (:description item)))]
+              (.addActionListener new-item
+                                  (action #(actfn (assoc item :since (now)))))
+              (.add menu new-item))))
         add-priority
         (fn [add-sep? priority prjs]
           (add-section
@@ -82,32 +81,35 @@
           (doseq [[prj items] (next prjs)] (add-section true prj items)))]
 
     ; remove old items
-    (doseq [index (range (.getItemCount menu))] (.removeItem menu 0))
+    (doseq [index (range (.getItemCount menu))] (.remove menu 0))
 
     ; add "now working" section
     (when active
       (let [stime (to-mins (- (now) (:since active)))]
-        (.addItem
+        (.add
           menu
-          (str "Session: "
-               (to-str stime)
-               " - Sum: "
-               (to-str (+ (:time active) stime)))
-          nil)
+          (MenuItem. (str "Session: "
+                          (to-str stime)
+                          " - Sum: "
+                          (to-str (+ (:time active) stime)))))
         (.addSeparator menu)
-        (.addItem menu "Stop work" (action #(deactfn)))
+        (let [stop-item (MenuItem. "Stop work")]
+          (.addActionListener stop-item (action #(deactfn)))
+          (.add menu stop-item))
         (.addSeparator menu)))
 
     ; add items sorted by priority and project
     (let [part-items (sort (parition-items items))]
       (if (first part-items)
         (add-priority false (key (first part-items)) (val (first part-items)))
-        (.addItem menu (str "No tasks in " file) nil))
+        (.add menu (MenuItem. (str "No tasks in " file))))
       (doseq [[pri prjs] (next part-items)] (add-priority true pri prjs)))
 
     ; quit menu item
     (.addSeparator menu)
-    (.addItem menu "Quit Atea" (action #((deactfn) (System/exit 0))))))
+    (let [quit-item (MenuItem. "Quit Atea")]
+      (.addActionListener quit-item (action #((deactfn) (System/exit 0))))
+      (.add menu quit-item))))
 
 ; IO -----------------------------------------------------------------------
 
@@ -268,7 +270,7 @@
         icon-inactive (load-icon "clock-inactive.png")
         icon-active (load-icon "clock.png")
         menu (create-menu)]
-    (.addTrayIcon (get-tray) menu 0)
+    (.addTrayIcon (get-tray) menu)
     (.setIcon menu icon-inactive)
     (.setActionListener
       menu
