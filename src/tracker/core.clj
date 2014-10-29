@@ -24,7 +24,9 @@
   (SystemTray/getSystemTray))
 
 (defn create-menu []
-  (PopupMenu.))
+  (let [p (PopupMenu.)]
+    (.add p (MenuItem. "Stupid"))
+    p))
 
 (defn action [f]
   (reify java.awt.event.ActionListener
@@ -276,24 +278,26 @@
         tray-icon (create-tray-icon menu)]
     (.add (get-tray) tray-icon)
     (.setImage tray-icon icon-inactive)
-    (.addActionListener
-     tray-icon
-     (action #(let [file (:file (load-cfg))
-                    tfile (ttname file)
-                    tasks (load-tasks file)
-                    ttasks (load-ttasks tfile)]
-                (when (and @old-file (not= @old-file file))
-                  (write-ttasks (ttname @old-file)
-                                (load-tasks @old-file)
-                                (load-ttasks (ttname @old-file))
-                                nil))
-                (when tasks
-                  (reset! old-file file)
-                  (update-items file menu tasks (:active ttasks)
-                                (fn [new-active]
-                                  (write-ttasks tfile tasks ttasks new-active)
-                                  (.setIcon menu icon-active))
-                                (fn []
-                                  (write-ttasks tfile tasks ttasks nil)
-                                  (.setIcon menu icon-inactive)))))))
+    (letfn [(update-all []
+              (let [file (:file (load-cfg))
+                             tfile (ttname file)
+                             tasks (load-tasks file)
+                             ttasks (load-ttasks tfile)]
+                         (when (and @old-file (not= @old-file file))
+                           (write-ttasks (ttname @old-file)
+                                         (load-tasks @old-file)
+                                         (load-ttasks (ttname @old-file))
+                                         nil))
+                         (when tasks
+                           (reset! old-file file)
+                           (update-items file menu tasks (:active ttasks)
+                                         (fn [new-active]
+                                           (write-ttasks tfile tasks ttasks new-active)
+                                           (.setIcon menu icon-active))
+                                         (fn []
+                                           (write-ttasks tfile tasks ttasks nil)
+                                           (.setIcon menu icon-inactive)))))
+              (.add menu (MenuItem. "Foo")))]
+      (.addActionListener tray-icon (action #(update-all)))
+      (update-all))
     (Thread/sleep (Long/MAX_VALUE))))
