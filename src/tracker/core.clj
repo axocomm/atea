@@ -265,36 +265,35 @@
       (str (match 1) "-times.csv")
       (str tname "-times.csv"))))
 
+(defn create-tray-icon [menu]
+  (TrayIcon. (load-icon "clock.png") "Menu" menu))
+
 (defn -main []
   (let [old-file (atom nil)
         icon-inactive (load-icon "clock-inactive.png")
         icon-active (load-icon "clock.png")
-        menu (create-menu)]
-    (.addTrayIcon (get-tray) menu)
-    (.setIcon menu icon-inactive)
-    (.setActionListener
-      menu
-      (action #(let [file (:file (load-cfg))
-                     tfile (ttname file)
-                     tasks (load-tasks file)
-                     ttasks (load-ttasks tfile)]
-
-                 ; if file *name* changed, write out old one first
-                 (when (and @old-file (not= @old-file file))
-                   ; we presume this is gonna work since it worked last time :)
-                   (write-ttasks (ttname @old-file)
-                                 (load-tasks @old-file)
-                                 (load-ttasks (ttname @old-file))
-                                 nil))
-
-                 ; update menu
-                 (when tasks
-                   (reset! old-file file)
-                   (update-items file menu tasks (:active ttasks)
-                                 (fn [new-active]
-                                   (write-ttasks tfile tasks ttasks new-active)
-                                   (.setIcon menu icon-active))
-                                 (fn []
-                                   (write-ttasks tfile tasks ttasks nil)
-                                   (.setIcon menu icon-inactive)))))))
-   (Thread/sleep (Long/MAX_VALUE))))
+        menu (create-menu)
+        tray-icon (create-tray-icon menu)]
+    (.add (get-tray) tray-icon)
+    (.setImage tray-icon icon-inactive)
+    (.addActionListener
+     tray-icon
+     (action #(let [file (:file (load-cfg))
+                    tfile (ttname file)
+                    tasks (load-tasks file)
+                    ttasks (load-ttasks tfile)]
+                (when (and @old-file (not= @old-file file))
+                  (write-ttasks (ttname @old-file)
+                                (load-tasks @old-file)
+                                (load-ttasks (ttname @old-file))
+                                nil))
+                (when tasks
+                  (reset! old-file file)
+                  (update-items file menu tasks (:active ttasks)
+                                (fn [new-active]
+                                  (write-ttasks tfile tasks ttasks new-active)
+                                  (.setIcon menu icon-active))
+                                (fn []
+                                  (write-ttasks tfile tasks ttasks nil)
+                                  (.setIcon menu icon-inactive)))))))
+    (Thread/sleep (Long/MAX_VALUE))))
