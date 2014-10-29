@@ -293,10 +293,10 @@
                            (update-items file menu tasks (:active ttasks)
                                          (fn [new-active]
                                            (write-ttasks tfile tasks ttasks new-active)
-                                           (.setIcon menu icon-active))
+                                           (.setImage tray-icon icon-active))
                                          (fn []
                                            (write-ttasks tfile tasks ttasks nil)
-                                           (.setIcon menu icon-inactive)))))
+                                           (.setImage tray-icon icon-inactive)))))
               (.add menu (MenuItem. "Foo")))]
       (.addActionListener tray-icon (action #(update-all)))
       (update-all))
