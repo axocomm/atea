@@ -297,7 +297,7 @@
                                          (fn []
                                            (write-ttasks tfile tasks ttasks nil)
                                            (.setImage tray-icon icon-inactive)))))
-              (.add menu (MenuItem. "Foo")))]
-      (.addActionListener tray-icon (action #(update-all)))
+              (doseq [i (range 0 (.getItemCount menu))]
+                (.addActionListener (.getItem menu i) (action #(update-all)))))]
       (update-all))
     (Thread/sleep (Long/MAX_VALUE))))
