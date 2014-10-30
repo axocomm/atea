@@ -299,5 +299,6 @@
                                            (.setImage tray-icon icon-inactive)))))
               (doseq [i (range 0 (.getItemCount menu))]
                 (.addActionListener (.getItem menu i) (action #(update-all)))))]
-      (update-all))
+      (update-all)
+      (watch-file "/Users/baron/tasks.txt" 1000 #(update-all)))
     (Thread/sleep (Long/MAX_VALUE))))
